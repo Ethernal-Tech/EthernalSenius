@@ -3,9 +3,10 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use market::msg::{CountResponse, HandleMsg, InitMsg, QueryMsg};
+use market::msg::{HandleMsg, InitMsg, QueryMsg};
 use market::state::State;
 
+// TODO: Enum schema types
 fn main() {
     let mut out_dir = current_dir().unwrap();
     out_dir.push("schema");
@@ -16,5 +17,4 @@ fn main() {
     export_schema(&schema_for!(HandleMsg), &out_dir);
     export_schema(&schema_for!(QueryMsg), &out_dir);
     export_schema(&schema_for!(State), &out_dir);
-    export_schema(&schema_for!(CountResponse), &out_dir);
 }
