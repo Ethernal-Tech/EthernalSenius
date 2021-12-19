@@ -1,4 +1,4 @@
-use cosmwasm_std::{CanonicalAddr, Storage};
+use cosmwasm_std::{HumanAddr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ pub static CONFIG_KEY: &[u8] = b"config";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub owner: CanonicalAddr,
+    pub owner: HumanAddr,
     pub last_meal: u128,
     pub starved: bool,
 }

@@ -1,12 +1,17 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
+use crate::msg::{FoodBurnFromMsg, HandleMsg, InitMsg, QueryMsg, QueryResponse};
+use crate::state::{config, config_read, State};
 use cosmwasm_std::{
     debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier,
-    StdError, StdResult, Storage,
+    StdError, StdResult, Storage, Uint128,
 };
+use secret_toolkit::utils::InitCallback;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::msg::{HandleMsg, InitMsg, QueryMsg, QueryResponse};
-use crate::state::{config, config_read, State};
+impl InitCallback for FoodBurnFromMsg {
+    const BLOCK_SIZE: usize = 256;
+}
+
+const CODE_ID: u64 = 1;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
@@ -20,7 +25,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let state = State {
         starved: false,
         last_meal: since_epoch.as_millis(),
-        owner: deps.api.canonical_address(&env.message.sender)?,
+        owner: env.message.sender.clone(),
     };
 
     config(&mut deps.storage).save(&state)?;
@@ -43,9 +48,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 pub fn try_feed<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    meals: u8,
+    meals: u128,
 ) -> StdResult<HandleResponse> {
-    let sender_address_raw = deps.api.canonical_address(&env.message.sender)?;
     config(&mut deps.storage).update(|mut state| {
         let four_hours = Duration::from_secs(4 * 60 * 60).as_millis();
         let now = SystemTime::now()
@@ -54,7 +58,7 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
             .as_millis();
         let four_hours_ago = now - four_hours;
 
-        if sender_address_raw != state.owner {
+        if env.message.sender != state.owner {
             return Err(StdError::Unauthorized { backtrace: None });
         }
         if state.starved {
@@ -78,8 +82,20 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
         }
         Ok(state)
     })?;
-    // TODO: Burn tokens message
-    Ok(HandleResponse::default())
+
+    let burn_from_msg = FoodBurnFromMsg {
+        owner: env.message.sender,
+        amount: Uint128(meals),
+        padding: None,
+    };
+    let cosmos_msg =
+        burn_from_msg.to_cosmos_msg("LABEL".to_string(), CODE_ID, "CODE_HASH".to_string(), None)?;
+
+    Ok(HandleResponse {
+        messages: vec![cosmos_msg],
+        log: vec![],
+        data: None,
+    })
 }
 
 pub fn query<S: Storage, A: Api, Q: Querier>(
