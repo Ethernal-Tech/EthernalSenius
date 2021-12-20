@@ -14,7 +14,7 @@ const CODE_ID: u64 = 1;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
+    env: Env,
     _msg: InitMsg,
 ) -> StdResult<InitResponse> {
     let state = State { food_token: None };
@@ -24,9 +24,9 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     // TODO: Init parameters omitted
     let food_init_msg = FoodInitMsg {
         name: "Food".to_string(),
-        admin: None,
+        admin: Some(env.contract.address),
         symbol: "FOOD".to_string(),
-        decimals: 0,
+        decimals: 2,
         initial_balances: None,
         prng_seed: Binary::from(b"prng_seed"),
         config: None,
