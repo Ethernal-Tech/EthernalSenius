@@ -10,7 +10,9 @@ pub struct FoodBurnFromMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {}
+pub struct InitMsg {
+    pub food: String,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]

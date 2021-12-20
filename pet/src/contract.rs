@@ -4,19 +4,17 @@ use cosmwasm_std::{
     debug_print, to_binary, Api, Binary, Env, Extern, HandleResponse, InitResponse, Querier,
     StdError, StdResult, Storage, Uint128,
 };
-use secret_toolkit::utils::InitCallback;
+use secret_toolkit::utils::HandleCallback;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-impl InitCallback for FoodBurnFromMsg {
+impl HandleCallback for FoodBurnFromMsg {
     const BLOCK_SIZE: usize = 256;
 }
-
-const CODE_ID: u64 = 1;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _msg: InitMsg,
+    msg: InitMsg,
 ) -> StdResult<InitResponse> {
     let since_epoch = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -24,6 +22,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     let state = State {
         starved: false,
+        food: msg.food,
         last_meal: since_epoch.as_millis(),
         owner: env.message.sender.clone(),
     };
@@ -50,6 +49,7 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
     env: Env,
     meals: u128,
 ) -> StdResult<HandleResponse> {
+    let state = config(&mut deps.storage).load()?;
     config(&mut deps.storage).update(|mut state| {
         let four_hours = Duration::from_secs(4 * 60 * 60).as_millis();
         let now = SystemTime::now()
@@ -80,16 +80,16 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
                 backtrace: None,
             });
         }
+        state.last_meal = now;
         Ok(state)
     })?;
 
     let burn_from_msg = FoodBurnFromMsg {
-        owner: env.message.sender,
+        owner: env.message.sender.clone(),
         amount: Uint128(meals),
         padding: None,
     };
-    let cosmos_msg =
-        burn_from_msg.to_cosmos_msg("LABEL".to_string(), CODE_ID, "CODE_HASH".to_string(), None)?;
+    let cosmos_msg = burn_from_msg.to_cosmos_msg(state.food, env.message.sender, None)?;
 
     Ok(HandleResponse {
         messages: vec![cosmos_msg],
