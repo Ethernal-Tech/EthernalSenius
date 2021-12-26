@@ -63,9 +63,12 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
             backtrace: None,
         });
     }
+    let since_epoch = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
 
     let state = config(&mut deps.storage).load()?;
-
     if state.starved {
         return Err(StdError::GenericErr {
             msg: "dead".to_string(),
@@ -73,25 +76,22 @@ pub fn try_feed<S: Storage, A: Api, Q: Querier>(
         });
     }
 
+    let mut starved = false;
     config(&mut deps.storage).update(|mut state| {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-
         if env.message.sender != state.owner {
             return Err(StdError::Unauthorized { backtrace: None });
         }
 
-        if state.full_until < now {
+        if state.full_until < since_epoch {
             state.starved = true;
+            starved = true;
         } else {
-            state.full_until = now + FOUR_HOURS;
+            state.full_until = since_epoch + FOUR_HOURS;
         }
         Ok(state)
     })?;
 
-    if state.starved {
+    if starved {
         return Err(StdError::GenericErr {
             msg: "died".to_string(),
             backtrace: None,
