@@ -52,8 +52,12 @@ pub fn try_buy<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
 ) -> StdResult<HandleResponse> {
-    // TODO: Not sure why is sent_funds Vec,
-    // skipping check if there are multiple funds of different denominations.
+    if env.message.sent_funds.len() != 1 {
+        return Err(StdError::GenericErr {
+            msg: "No funds or multiple sent funds".to_string(),
+            backtrace: None,
+        });
+    }
     let sent_funds = &env.message.sent_funds[0];
     if sent_funds.denom != "SCRT" {
         return Err(StdError::GenericErr {
