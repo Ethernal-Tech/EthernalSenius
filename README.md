@@ -1,4 +1,18 @@
-# Tamagotchi (CosmWasm Test task)
+# Tamagotchi
+
+## Food
+
+Copy of SNIP-20 reference implementation.
+
+## Market
+
+Contract for buying FOOD tokens.
+
+## Pet
+
+Contract for instancing and feeding pet.
+
+# CosmWasm Test task
 
 ## Intro
 Some of us still remember the times back when we had our first digital pets - Tamagochi. As kids it was very challenging to keep your pet fed, clean and happy.

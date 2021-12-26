@@ -8,8 +8,9 @@ pub static CONFIG_KEY: &[u8] = b"config";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub owner: HumanAddr,
-    pub food: String,
-    pub last_meal: u128,
+    pub food_token_code_hash: String,
+    pub food_token_addr: HumanAddr,
+    pub full_until: u128,
     pub starved: bool,
 }
 

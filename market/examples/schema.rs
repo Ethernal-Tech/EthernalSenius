@@ -3,7 +3,7 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use market::msg::{HandleMsg, InitMsg, QueryMsg};
+use market::msg::{HandleMsg, InitMsg};
 use market::state::State;
 
 // TODO: Enum schema types

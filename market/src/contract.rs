@@ -1,39 +1,36 @@
-use crate::msg::{FoodInitMsg, HandleMsg, InitMsg, QueryMsg};
+use crate::msg::{FoodHandleMsg, HandleMsg, InitMsg};
 use crate::state::{config, State};
 use cosmwasm_std::{
-    Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, InitResponse, Querier, StdError,
-    StdResult, Storage,
+    Api, Env, Extern, HandleResponse, InitResponse, Querier, StdError, StdResult, Storage, Uint128,
 };
-use secret_toolkit::utils::InitCallback;
+use secret_toolkit::utils::HandleCallback;
 
-impl InitCallback for FoodInitMsg {
+impl HandleCallback for FoodHandleMsg {
     const BLOCK_SIZE: usize = 256;
 }
-
-const CODE_ID: u64 = 1;
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    _msg: InitMsg,
+    msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    let state = State { food_token: None };
+    let state = State {
+        food_token_code_hash: msg.food_token_code_hash.clone(),
+        food_token_addr: msg.food_token_addr.clone(),
+    };
 
     config(&mut deps.storage).save(&state)?;
 
-    // TODO: Init parameters omitted
-    let food_init_msg = FoodInitMsg {
-        name: "Food".to_string(),
-        admin: Some(env.contract.address),
-        symbol: "FOOD".to_string(),
-        decimals: 2,
-        initial_balances: None,
-        prng_seed: Binary::from(b"prng_seed"),
-        config: None,
+    // FOOD token should be instantiated via cli.
+    // This shoud set FOOD token address in state,
+    // and also set Maket contract as FOOD token only minter.
+    let food_init_msg = FoodHandleMsg::SetMinters {
+        minters: vec![env.contract.address],
+        padding: None,
     };
 
     let cosmos_msg =
-        food_init_msg.to_cosmos_msg("LABEL".to_string(), CODE_ID, "CODE_HASH".to_string(), None)?;
+        food_init_msg.to_cosmos_msg(msg.food_token_code_hash, msg.food_token_addr, None)?;
 
     Ok(InitResponse {
         messages: vec![cosmos_msg],
@@ -47,64 +44,43 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::Register { snip_20 } => try_register(deps, env, snip_20),
+        HandleMsg::Buy {} => try_buy(deps, env),
     }
 }
 
-pub fn try_register<S: Storage, A: Api, Q: Querier>(
+pub fn try_buy<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    _env: Env,
-    snip_20: CanonicalAddr,
+    env: Env,
 ) -> StdResult<HandleResponse> {
-    config(&mut deps.storage).update(|mut state| {
-        if state.food_token == None {
-            state.food_token = Some(snip_20);
-            Ok(state)
-        } else {
-            Err(StdError::GenericErr {
-                msg: "Already registered".to_string(),
-                backtrace: None,
-            })
-        }
-    })?;
-    Ok(HandleResponse::default())
-}
-
-pub fn query<S: Storage, A: Api, Q: Querier>(
-    _: &Extern<S, A, Q>,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
-    match msg {}
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::coins;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env};
-
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies(0, &[]);
-
-        let msg = InitMsg {};
-        let env = mock_env("sender", &coins(0, "f"));
-        let res = init(&mut deps, env, msg).unwrap();
-        assert_eq!(1, res.messages.len());
+    // TODO: Not sure why is sent_funds Vec,
+    // skipping check if there are multiple funds of different denominations.
+    let sent_funds = &env.message.sent_funds[0];
+    if sent_funds.denom != "SCRT" {
+        return Err(StdError::GenericErr {
+            msg: "Invalid denomination".to_string(),
+            backtrace: None,
+        });
     }
 
-    #[test]
-    fn register() {
-        let mut deps = mock_dependencies(0, &[]);
+    let state = config(&mut deps.storage).load()?;
 
-        let env = mock_env("sender", &coins(0, "f"));
-        let msg = HandleMsg::Register {
-            snip_20: CanonicalAddr(Binary::from(b"address")),
-        };
-        let res = handle(&mut deps, env, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+    // Not sure what is the meaning of decimals in SNIP-20,
+    // but this should enforce SCRT/FOOD ratio of 1:100.
+    // This also means that decimals should be handled by UI.
+    let amount = sent_funds.amount.u128() * 100;
 
-        // TODO: Test fails, handle returns Err instead of Ok
-        // TODO: Implement query to validate food_token?
-    }
+    let food_mint_msg = FoodHandleMsg::Mint {
+        recipient: env.message.sender,
+        amount: Uint128::from(amount),
+        padding: None,
+    };
+
+    let cosmos_msg =
+        food_mint_msg.to_cosmos_msg(state.food_token_code_hash, state.food_token_addr, None)?;
+
+    Ok(HandleResponse {
+        messages: vec![cosmos_msg],
+        log: vec![],
+        data: None,
+    })
 }
